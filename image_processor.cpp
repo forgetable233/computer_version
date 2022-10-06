@@ -146,33 +146,36 @@ void ImageProcessor::Filter(const Eigen::Matrix3d &filter_core) {
     }
     const int rows = gaussian_noise_image_.rows;
     const int cols = gaussian_noise_image_.cols;
-    Eigen::MatrixXd matrix(rows + 2, cols + 2);
+
+    Eigen::MatrixXd gaussian_matrix(rows + 2, cols + 2);
+    Eigen::MatrixXd salt_matrix(rows + 2, cols + 2);
     Eigen::MatrixXd mat2eigen(rows, cols);
-    Eigen::MatrixXd result_matrix(rows, cols);
+    Eigen::MatrixXd gaussian_result_matrix(rows, cols);
+    Eigen::MatrixXd salt_result_matrix(rows, cols);
     Eigen::Matrix3d temp_matrix;
-    /** 首先进行高斯的卷积 **/
+
     cv::cv2eigen(gaussian_noise_image_, mat2eigen);
-    matrix.block(1, 1, rows, cols) = mat2eigen;
-    for (int i = 1; i < rows + 1; ++i) {
-        for (int j = 1; j < cols + 1; ++j) {
-            temp_matrix = matrix.block<3, 3>(i - 1, j - 1);
-            result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
-        }
-    }
-    cv::eigen2cv(result_matrix, gaussian_filtered_image_);
-    gaussian_filtered_image_.convertTo(gaussian_filtered_image_, CV_8UC1);
-    ViewImage(GAUSSIAN_FILTERED);
-    /** 下面进行盐椒的卷积 **/
+    gaussian_matrix.block(1, 1, rows, cols) = mat2eigen;
     cv::cv2eigen(salt_pepper_noise_image_, mat2eigen);
-    matrix.block(1, 1, rows, cols) = mat2eigen;
+    salt_matrix.block(1, 1, rows, cols) = mat2eigen;
+
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
-            temp_matrix = matrix.block<3, 3>(i - 1, j - 1);
-            result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+            /** 首先进行高斯的卷积 **/
+            temp_matrix = gaussian_matrix.block<3, 3>(i - 1, j - 1);
+            gaussian_result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+            /** 下面进行盐椒的卷积 **/
+            temp_matrix = salt_matrix.block<3, 3>(i - 1, j - 1);
+            salt_result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
         }
     }
-    cv::eigen2cv(result_matrix, salt_pepper_noise_image_);
-    salt_pepper_noise_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
+    cv::eigen2cv(gaussian_result_matrix, gaussian_filtered_image_);
+    cv::eigen2cv(salt_result_matrix, salt_pepper_filtered_image_);
+    gaussian_filtered_image_.convertTo(gaussian_filtered_image_, CV_8UC1);
+    salt_pepper_filtered_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
+    ViewImage(GAUSSIAN_NOISE);
+    ViewImage(SALT_PEPPER_NOISE);
+    ViewImage(GAUSSIAN_FILTERED);
     ViewImage(SALT_PEPPER_FILTERED);
 }
 
