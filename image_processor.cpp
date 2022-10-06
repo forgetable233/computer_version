@@ -139,7 +139,7 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
     noise_added_ = true;
 }
 
-void ImageProcessor::Filter(const Eigen::Matrix3d &filter_core) {
+void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     if (!noise_added_) {
         std::cerr << "Haven't add noise to the image" << std::endl;
         return;
@@ -173,10 +173,6 @@ void ImageProcessor::Filter(const Eigen::Matrix3d &filter_core) {
     cv::eigen2cv(salt_result_matrix, salt_pepper_filtered_image_);
     gaussian_filtered_image_.convertTo(gaussian_filtered_image_, CV_8UC1);
     salt_pepper_filtered_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
-    ViewImage(GAUSSIAN_NOISE);
-    ViewImage(SALT_PEPPER_NOISE);
-    ViewImage(GAUSSIAN_FILTERED);
-    ViewImage(SALT_PEPPER_FILTERED);
 }
 
 double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix) {
@@ -187,4 +183,16 @@ double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d 
         }
     }
     return re;
+}
+
+double ImageProcessor::ComputeSNR(int choose) {
+    Eigen::MatrixXd origin_image(resized_image_.rows, resized_image_.cols);
+    Eigen::MatrixXd filtered_image(resized_image_.rows, resized_image_.cols);
+    cv::cv2eigen(grey_image_, origin_image);
+    if (choose == 0) {
+        cv::cv2eigen(gaussian_filtered_image_, filtered_image);
+    } else if (choose == 1) {
+        cv::cv2eigen(salt_pepper_filtered_image_, filtered_image);
+    }
+    return 20 * log(origin_image.norm() / (origin_image - filtered_image).norm());
 }

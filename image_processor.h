@@ -7,6 +7,7 @@
 #include <random>
 
 #include <Eigen/Eigen>
+#include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/eigen.hpp>
@@ -49,11 +50,12 @@ public:
 
     void AddNoise(const double mean, const double sigma, const double dis);
 
-    void Filter(const Eigen::Matrix3d &filter_core);
+    // TODO 更改函数格式，使用template
+    void MyGaussFilter(const Eigen::Matrix3d &filter_core);
 
     static double Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix);
 
-    double ComputeSNR();
+    double ComputeSNR(int choose);
 };
 
 

@@ -39,5 +39,7 @@ int main() {
             filter_core(i, j) = filter_core(i, j) / sum;
         }
     }
-    target_image->Filter(filter_core);
+    target_image->MyGaussFilter(filter_core);
+    std::cout << target_image->ComputeSNR(0) << std::endl;
+    std::cout << target_image->ComputeSNR(1) << std::endl;
 }
