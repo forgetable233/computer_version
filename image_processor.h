@@ -20,7 +20,8 @@ enum ImageChoose {
     GRAY,
     GAUSSIAN_NOISE,
     SALT_PEPPER_NOISE,
-    NOISE_COMBINED
+    GAUSSIAN_FILTERED,
+    SALT_PEPPER_FILTERED
 };
 
 class ImageProcessor {
@@ -30,9 +31,11 @@ private:
     cv::Mat grey_image_;
     cv::Mat gaussian_noise_image_;
     cv::Mat salt_pepper_noise_image_;
-    cv::Mat filtered_image_;
+    cv::Mat gaussian_filtered_image_;
+    cv::Mat salt_pepper_filtered_image_;
 
-    bool have_finished_resize_ = false;
+    bool finished_resize_ = false;
+    bool noise_added_ = false;
 public:
     ImageProcessor() = default;
 
@@ -46,7 +49,11 @@ public:
 
     void AddNoise(const double mean, const double sigma, const double dis);
 
-    void Filter(Eigen::Matrix3d filter_core);
+    void Filter(const Eigen::Matrix3d &filter_core);
+
+    static double Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix);
+
+    double ComputeSNR();
 };
 
 

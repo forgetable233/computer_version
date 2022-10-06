@@ -35,7 +35,15 @@ void ImageProcessor::ViewImage(ImageChoose choose) {
             break;
         case SALT_PEPPER_NOISE:
             std::cout << "The salt and pepper noise image" << std::endl;
-            cv::imshow("gaussian noise image", salt_pepper_noise_image_);
+            cv::imshow("salt and pepper noise image", salt_pepper_noise_image_);
+            break;
+        case GAUSSIAN_FILTERED:
+            std::cout << "The gaussian filtered noise image" << std::endl;
+            cv::imshow("gaussian filtered image", gaussian_filtered_image_);
+            break;
+        case SALT_PEPPER_FILTERED:
+            std::cout << "The salt and pepper filtered noise image" << std::endl;
+            cv::imshow("salt and pepper filtered image", salt_pepper_filtered_image_);
             break;
         default:
             std::cerr << "Can not find the target image" << std::endl;
@@ -62,8 +70,10 @@ void ImageProcessor::ResizeImage(int row, int cols) {
                         image_.at<cv::Vec3b>(static_cast<int>(i * row_jump), static_cast<int>(j * cols_jump));
             }
         }
-        have_finished_resize_ = true;
+        finished_resize_ = true;
+        std::cout << "==============================================================" << std::endl;
         std::cout << "Have finished the resize of the image" << std::endl;
+        std::cout << "==============================================================" << std::endl << std::endl;
     } else {
         std::cerr << "The target rows and columns are too large" << std::endl;
     }
@@ -73,7 +83,7 @@ void ImageProcessor::ResizeImage(int row, int cols) {
  * 将彩色图像转化为灰度图，这里使用到了加权平均法
  */
 void ImageProcessor::CvtToGray() {
-    if (!have_finished_resize_) {
+    if (!finished_resize_) {
         std::cerr << "Haven't finished the resize" << std::endl;
         return;
     }
@@ -87,7 +97,9 @@ void ImageProcessor::CvtToGray() {
                     static_cast<double>(resized_image_.at<cv::Vec3b>(i, j)[2]) * 0.3);
         }
     }
+    std::cout << "==============================================================" << std::endl;
     std::cout << "Have finished converting to grey image" << std::endl;
+    std::cout << "==============================================================" << std::endl << std::endl;
 }
 
 /**
@@ -101,20 +113,15 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
     grey_image_.copyTo(gaussian_noise_image_);
     grey_image_.copyTo(salt_pepper_noise_image_);
 
-    /** 首先进行高斯噪音的添加 **/
     std::default_random_engine generator;
     std::normal_distribution<double> distribution(mean, sigma);
 
     for (int i = 0; i < grey_image_.rows; ++i) {
         for (int j = 0; j < grey_image_.cols; ++j) {
+            /** 首先进行高斯噪音的添加 **/
             gaussian_noise_image_.at<u_char>(i, j) = static_cast<u_char>(grey_image_.at<u_char>(i, j) +
                                                                          distribution(generator));
-        }
-    }
-
-    /** 下面进行椒盐分布噪音的添加 **/
-    for (int i = 0; i < grey_image_.rows; ++i) {
-        for (int j = 0; j < grey_image_.cols; ++j) {
+            /** 下面进行椒盐分布噪音的添加 **/
             if (rand() <= RAND_MAX * dis) {
                 if (rand() <= RAND_MAX / 2) {
                     salt_pepper_noise_image_.at<u_char>(i, j) = 0;
@@ -126,8 +133,55 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
             }
         }
     }
+    std::cout << "==============================================================" << std::endl;
+    std::cout << "Have finished adding the noise" << std::endl;
+    std::cout << "==============================================================" << std::endl << std::endl;
+    noise_added_ = true;
 }
 
-void ImageProcessor::Filter(Eigen::Matrix3d filter_core) {
+void ImageProcessor::Filter(const Eigen::Matrix3d &filter_core) {
+    if (!noise_added_) {
+        std::cerr << "Haven't add noise to the image" << std::endl;
+        return;
+    }
+    const int rows = gaussian_noise_image_.rows;
+    const int cols = gaussian_noise_image_.cols;
+    Eigen::MatrixXd matrix(rows + 2, cols + 2);
+    Eigen::MatrixXd mat2eigen(rows, cols);
+    Eigen::MatrixXd result_matrix(rows, cols);
+    Eigen::Matrix3d temp_matrix;
+    /** 首先进行高斯的卷积 **/
+    cv::cv2eigen(gaussian_noise_image_, mat2eigen);
+    matrix.block(1, 1, rows, cols) = mat2eigen;
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            temp_matrix = matrix.block<3, 3>(i - 1, j - 1);
+            result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+        }
+    }
+    cv::eigen2cv(result_matrix, gaussian_filtered_image_);
+    gaussian_filtered_image_.convertTo(gaussian_filtered_image_, CV_8UC1);
+    ViewImage(GAUSSIAN_FILTERED);
+    /** 下面进行盐椒的卷积 **/
+    cv::cv2eigen(salt_pepper_noise_image_, mat2eigen);
+    matrix.block(1, 1, rows, cols) = mat2eigen;
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            temp_matrix = matrix.block<3, 3>(i - 1, j - 1);
+            result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+        }
+    }
+    cv::eigen2cv(result_matrix, salt_pepper_noise_image_);
+    salt_pepper_noise_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
+    ViewImage(SALT_PEPPER_FILTERED);
+}
 
+double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix) {
+    double re = 0;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            re += core(i, j) * matrix(i, j);
+        }
+    }
+    return re;
 }
