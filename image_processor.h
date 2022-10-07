@@ -44,6 +44,8 @@ public:
 
     void ViewImage(ImageChoose choose);
 
+    static void ViewImage(const cv::Mat &image);
+
     void ResizeImage(int row, int cols);
 
     void CvtToGray();
@@ -53,9 +55,17 @@ public:
     // TODO 更改函数格式，使用template
     void MyGaussFilter(const Eigen::Matrix3d &filter_core);
 
+    void MiddleFilter(cv::Mat &srcImg, cv::Mat &dstImg);
+
+    void GetGaussImage(cv::Mat &dst_img);
+
+    void GetSaltImage(cv::Mat &dst_img);
+
     static double Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix);
 
     double ComputeSNR(int choose);
+
+    inline double GetMiddleValue(Eigen::Matrix3d &matrix);
 };
 
 

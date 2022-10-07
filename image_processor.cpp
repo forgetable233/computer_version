@@ -84,7 +84,7 @@ void ImageProcessor::ResizeImage(int row, int cols) {
  */
 void ImageProcessor::CvtToGray() {
     if (!finished_resize_) {
-        std::cerr << "Haven't finished the resize" << std::endl;
+        std::cerr << "没有完成图像resize" << std::endl;
         return;
     }
     cv::Mat temp_grey_image(cv::Size(resized_image_.rows, resized_image_.cols), CV_8UC1);
@@ -98,7 +98,7 @@ void ImageProcessor::CvtToGray() {
         }
     }
     std::cout << "==============================================================" << std::endl;
-    std::cout << "Have finished converting to grey image" << std::endl;
+    std::cout << "完成灰度图转化" << std::endl;
     std::cout << "==============================================================" << std::endl << std::endl;
 }
 
@@ -134,14 +134,14 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
         }
     }
     std::cout << "==============================================================" << std::endl;
-    std::cout << "Have finished adding the noise" << std::endl;
+    std::cout << "已完成图像噪声的添加" << std::endl;
     std::cout << "==============================================================" << std::endl << std::endl;
     noise_added_ = true;
 }
 
 void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     if (!noise_added_) {
-        std::cerr << "Haven't add noise to the image" << std::endl;
+        std::cerr << "没有完成图像噪声的添加" << std::endl;
         return;
     }
     const int rows = gaussian_noise_image_.rows;
@@ -195,4 +195,48 @@ double ImageProcessor::ComputeSNR(int choose) {
         cv::cv2eigen(salt_pepper_filtered_image_, filtered_image);
     }
     return 20 * log(origin_image.norm() / (origin_image - filtered_image).norm());
+}
+
+void ImageProcessor::GetGaussImage(cv::Mat &dst_img) {
+    this->gaussian_noise_image_.copyTo(dst_img);
+}
+
+void ImageProcessor::GetSaltImage(cv::Mat &dst_img) {
+    this->salt_pepper_noise_image_.copyTo(dst_img);
+}
+
+void ImageProcessor::MiddleFilter(cv::Mat &srcImg, cv::Mat &dstImg) {
+    const int rows = srcImg.rows;
+    const int cols = srcImg.cols;
+    Eigen::MatrixXd src_eigen(rows, cols);
+    Eigen::MatrixXd dst_eigen(rows, cols);
+    Eigen::MatrixXd temp_Eigen(rows + 2, cols + 2);
+
+    cv::cv2eigen(srcImg, src_eigen);
+    temp_Eigen.block(1, 1, rows, cols) = src_eigen;
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            Eigen::Matrix3d temp = temp_Eigen.block<3, 3>(i - 1, j - 1);
+            dst_eigen(i - 1, j - 1) = GetMiddleValue(temp);
+        }
+    }
+    cv::eigen2cv(dst_eigen, dstImg);
+    dstImg.convertTo(dstImg, CV_8UC1);
+    std::cout << "==============================================================" << std::endl;
+    std::cout << "已完成图像中值去噪声" << std::endl;
+    std::cout << "==============================================================" << std::endl << std::endl;
+}
+
+void ImageProcessor::ViewImage(const cv::Mat &image) {
+    std::cout << image.rows << ' ' << image.cols << std::endl;
+    cv::imshow("input image", image);
+    cv::waitKey(0);
+}
+
+double ImageProcessor::GetMiddleValue(Eigen::Matrix3d &matrix) {
+    double array[] = {matrix(0, 0), matrix(0, 1), matrix(0, 2),
+                      matrix(1, 0), matrix(1, 1), matrix(1, 2),
+                      matrix(2, 0), matrix(2, 1), matrix(2, 2)};
+    std::sort(array, array + 9);
+    return array[4];
 }

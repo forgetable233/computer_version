@@ -14,7 +14,7 @@
 #define PI acos(-1)
 
 int main() {
-    std::string file_path = "/home/dcr/CLionProjects/computer_version/picture.jpg";
+    std::string file_path = "../picture.jpg";
 
     auto target_image = new ImageProcessor(file_path);
     target_image->ResizeImage(512, 512);
@@ -42,4 +42,14 @@ int main() {
     target_image->MyGaussFilter(filter_core);
     std::cout << target_image->ComputeSNR(0) << std::endl;
     std::cout << target_image->ComputeSNR(1) << std::endl;
+
+    cv::Mat srcImg;
+    cv::Mat dstImg;
+    target_image->GetGaussImage(srcImg);
+    target_image->MiddleFilter(srcImg, dstImg);
+//    ImageProcessor::ViewImage(dstImg);
+    target_image->GetSaltImage(srcImg);
+    target_image->MiddleFilter(srcImg, dstImg);
+//    ImageProcessor::ViewImage(srcImg);
+//    ImageProcessor::ViewImage(dstImg);
 }
