@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <random>
+#include <cmath>
 
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
@@ -65,7 +66,11 @@ public:
 
     double ComputeSNR(int choose);
 
-    inline double GetMiddleValue(Eigen::Matrix3d &matrix);
+    static inline double GetMiddleValue(Eigen::Matrix3d &matrix);
+
+    void SobelDetector(cv::Mat &dstImg);
+
+    void NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle);
 };
 
 

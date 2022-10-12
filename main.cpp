@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <cmath>
+#include <stdio.h>
 #include <memory>
 
 #include <opencv2/opencv.hpp>
@@ -52,4 +53,7 @@ int main() {
     target_image->MiddleFilter(srcImg, dstImg);
 //    ImageProcessor::ViewImage(srcImg);
 //    ImageProcessor::ViewImage(dstImg);
+    cv::Mat edge_detect;
+    target_image->SobelDetector(edge_detect);
+//    cv::imshow("The edge", edge_detect);
 }

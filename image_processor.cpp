@@ -139,6 +139,10 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
     noise_added_ = true;
 }
 
+/**
+ * 高斯滤波函数，输入对应的卷积核
+ * @param filter_core
+ */
 void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     if (!noise_added_) {
         std::cerr << "没有完成图像噪声的添加" << std::endl;
@@ -175,6 +179,12 @@ void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     salt_pepper_filtered_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
 }
 
+/**
+ * 进行卷积操作，得出卷积结果
+ * @param core
+ * @param matrix
+ * @return
+ */
 double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix) {
     double re = 0;
     for (int i = 0; i < 3; ++i) {
@@ -185,6 +195,11 @@ double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d 
     return re;
 }
 
+/**
+ * 计算SNR，用来判断滤波效果
+ * @param choose
+ * @return
+ */
 double ImageProcessor::ComputeSNR(int choose) {
     Eigen::MatrixXd origin_image(resized_image_.rows, resized_image_.cols);
     Eigen::MatrixXd filtered_image(resized_image_.rows, resized_image_.cols);
@@ -205,6 +220,11 @@ void ImageProcessor::GetSaltImage(cv::Mat &dst_img) {
     this->salt_pepper_noise_image_.copyTo(dst_img);
 }
 
+/**
+ * 中值滤波函数
+ * @param srcImg
+ * @param dstImg
+ */
 void ImageProcessor::MiddleFilter(cv::Mat &srcImg, cv::Mat &dstImg) {
     const int rows = srcImg.rows;
     const int cols = srcImg.cols;
@@ -233,10 +253,66 @@ void ImageProcessor::ViewImage(const cv::Mat &image) {
     cv::waitKey(0);
 }
 
+/**
+ * 辅助中值滤波，得到中值
+ * @param matrix
+ * @return
+ */
 double ImageProcessor::GetMiddleValue(Eigen::Matrix3d &matrix) {
     double array[] = {matrix(0, 0), matrix(0, 1), matrix(0, 2),
                       matrix(1, 0), matrix(1, 1), matrix(1, 2),
                       matrix(2, 0), matrix(2, 1), matrix(2, 2)};
     std::sort(array, array + 9);
     return array[4];
+}
+
+/**
+ * 利用灰度图进行边缘检测
+ * @param dstImg
+ */
+void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
+    int rows = this->grey_image_.rows;
+    int cols = this->grey_image_.cols;
+//    dstImg.resize(rows, cols);
+    Eigen::MatrixXd eigen_grey;
+    Eigen::MatrixXd round_eigen(rows + 2, cols + 2);
+    Eigen::MatrixXd dx(rows, cols);
+    Eigen::MatrixXd dy(rows, cols);
+    Eigen::MatrixXd M(rows, cols);
+    Eigen::MatrixXd angle(rows, cols);
+    Eigen::Matrix3d sobel_x;
+    Eigen::Matrix3d sobel_y;
+
+    cv::cv2eigen(this->grey_image_, eigen_grey);
+    round_eigen.block(1, 1, rows, cols);
+    sobel_x << 1, 2, 1,
+            0, 0, 0,
+            -1, -2, -1;
+    sobel_y << 1, 0, -1,
+            2, 0, -2,
+            1, 0, -1;
+
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
+            dx(i - 1, j - 1) = Convolution(sobel_x, temp);
+            dy(i - 1, j - 1) = Convolution(sobel_y, temp);
+            M(i - 1, j - 1) = sqrt(pow(dx(i - 1, j - 1), 2) + pow(dy(i - 1, j - 1), 2));
+            angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
+        }
+    }
+
+    NMS(M, angle);
+}
+
+void ImageProcessor::NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle) {
+    const long int rows = M.rows();
+    const long int cols = angle.cols();
+    Eigen::MatrixXd temp(rows + 2, cols + 2);
+    temp.block(1, 1, rows, cols) = M;
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+
+        }
+    }
 }
