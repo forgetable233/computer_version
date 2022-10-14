@@ -284,25 +284,45 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
     Eigen::Matrix3d sobel_y;
 
     cv::cv2eigen(this->grey_image_, eigen_grey);
-    round_eigen.block(1, 1, rows, cols);
+    round_eigen.block(1, 1, rows, cols) = eigen_grey;
     sobel_x << 1, 2, 1,
             0, 0, 0,
             -1, -2, -1;
-    sobel_y << 1, 0, -1,
-            2, 0, -2,
-            1, 0, -1;
+    sobel_y << -1, 0, 1,
+            -2, 0, 2,
+            -1, 0, 1;
 
+    double max = 0;
+    double min = MAXFLOAT;
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
             Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
             dx(i - 1, j - 1) = Convolution(sobel_x, temp);
             dy(i - 1, j - 1) = Convolution(sobel_y, temp);
-            M(i - 1, j - 1) = sqrt(pow(dx(i - 1, j - 1), 2) + pow(dy(i - 1, j - 1), 2));
+//            M(i - 1, j - 1) = sqrt(pow(dx(i - 1, j - 1), 2) + pow(dy(i - 1, j - 1), 2));
+            M(i - 1, j - 1) = sqrt(dx(i - 1, j - 1) * dx(i - 1, j - 1) + dy(i - 1, j - 1) * dy(i - 1, j - 1));
+            if (max < M(i - 1, j - 1)) {
+                max = M(i - 1, j - 1);
+            }
+            if (min > M(i - 1, j - 1)) {
+                min = M(i - 1, j - 1);
+            }
             angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
         }
     }
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            M(i, j) /= max - min;
+        }
+    }
 
-    NMS(M, angle);
+    cv::Mat M_cv;
+    cv::eigen2cv(M, M_cv);
+    std::cout << M_cv << std::endl;
+    cv::imshow("M", M_cv);
+    cv::waitKey(0);
+
+//    NMS(M, angle);
 }
 
 void ImageProcessor::NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle) {
