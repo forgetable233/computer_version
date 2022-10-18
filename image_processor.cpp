@@ -302,20 +302,26 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
 
     cv::cv2eigen(this->grey_image_, eigen_grey);
     round_eigen.block(1, 1, rows, cols) = eigen_grey;
-    sobel_x << 1, 2, 1,
+    sobel_x << -1, -2, -1,
             0, 0, 0,
-            -1, -2, -1;
+            1, 2, 1;
     sobel_y << -1, 0, 1,
             -2, 0, 2,
             -1, 0, 1;
-
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
             Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
             dx(i - 1, j - 1) = Convolution(sobel_x, temp);
             dy(i - 1, j - 1) = Convolution(sobel_y, temp);
-            M(i - 1, j - 1) = static_cast<uchar>(sqrt(
-                    dx(i - 1, j - 1) * dx(i - 1, j - 1) + dy(i - 1, j - 1) * dy(i - 1, j - 1)));
+            int temp_x = (int) dx(i - 1, j - 1) * (int) dx(i - 1, j - 1);
+            int temp_y = (int) dy(i - 1, j - 1) * (int) dy(i - 1, j - 1);
+            int temp_re = static_cast<int >(
+                    sqrt(temp_x + temp_y));
+            if (temp_re > 255)  {
+                M(i - 1, j - 1) = 255;
+            } else {
+                M(i - 1, j - 1) = temp_re;
+            }
             angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
         }
     }
@@ -325,16 +331,29 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
     cv::eigen2cv(dy, d_y_mat);
     d_x_mat.convertTo(d_x_mat, CV_8UC1);
     d_y_mat.convertTo(d_y_mat, CV_8UC1);
-//    cv::imshow("d_x", d_x_mat);
-//    cv::waitKey(0);
-//    cv::imshow("d_y", d_y_mat);
-//    cv::waitKey(0);
-//    cv::Mat temp_M;
-//    cv::eigen2cv(M, temp_M);
-//    cv::imshow("test", temp_M);
-//    cv::waitKey(0);
+    cv::imshow("d_x", d_x_mat);
+    cv::waitKey(0);
+    cv::imshow("d_y", d_y_mat);
+    cv::waitKey(0);
+    cv::Mat temp_M;
+    cv::eigen2cv(M, temp_M);
+    cv::imshow("test", temp_M);
+    cv::waitKey(0);
     NMS(M, angle);
     cv::eigen2cv(M, dstImg);
+
+//    cv::Mat opencv_sobel;
+//    cv::Mat opencv_x;
+//    cv::Mat opencv_y;
+//    cv::Sobel(this->grey_image_, opencv_x, CV_8UC1, 1, 0);
+//    cv::imshow("opencv x", opencv_x);
+//    cv::waitKey(0);
+//    cv::Sobel(this->grey_image_, opencv_y, CV_8UC1, 0, 1);
+//    cv::imshow("opencv y", opencv_y);
+//    cv::waitKey(0);
+//    cv::addWeighted(opencv_x, 0.5, opencv_y, 0.5, 0, opencv_sobel);
+//    cv::imshow("opencv", opencv_sobel);
+//    cv::waitKey(0);
 }
 
 void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle) {
@@ -344,26 +363,35 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
     Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> temp(rows + 2, cols + 2);
     std::cout << temp.rows() << ' ' << temp.cols() << std::endl;
     temp.block(1, 1, rows, cols) = M;
+    Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> NMS(rows, cols);
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
             if (angle(i - 1, j - 1) >= -M_PI * (3 / 8) && angle(i - 1, j - 1) < -M_PI / 8) {
-                if (!(temp(i, j) > temp(i - 1, j - 1) && temp(i, j) > temp(i + 1, j + 1))) {
-                    temp(i, j) = 0;
+                if (!(temp(i, j) >= temp(i - 1, j - 1) && temp(i, j) >= temp(i + 1, j + 1))) {
+                    NMS(i - 1, j - 1) = 0;
+                } else {
+                    NMS(i - 1, j - 1) = temp(i, j);
                 }
             } else if (angle(i - 1, j - 1) >= -M_PI / 8 && angle(i - 1, j - 1) < M_PI / 8) {
-                if (!(temp(i, j) > temp(i, j - 1) && temp(i, j) > temp(i, j + 1))) {
-                    temp(i, j) = 0;
+                if (!(temp(i, j) >= temp(i, j - 1) && temp(i, j) >= temp(i, j + 1))) {
+                    NMS(i - 1, j - 1) = 0;
+                } else {
+                    NMS(i - 1, j - 1) = temp(i, j);
                 }
             } else if (angle(i - 1, j - 1) >= M_PI / 8 && angle(i - 1, j - 1) < M_PI * (3 / 8)) {
-                if (!(temp(i, j) > temp(i + 1, j - 1) && temp(i, j) > temp(i - 1, j + 1))) {
-                    temp(i, j) = 0;
+                if (!(temp(i, j) >= temp(i + 1, j - 1) && temp(i, j) >= temp(i - 1, j + 1))) {
+                    NMS(i - 1, j - 1) = 0;
+                } else {
+                    NMS(i - 1, j - 1) = temp(i, j);
                 }
             } else {
-                if (!(temp(i, j) > temp(i, j + 1) && temp(i, j) > temp(i, j - 1))) {
-                    temp(i, j) = 0;
+                if (!(temp(i, j) >= temp(i, j + 1) && temp(i, j) >= temp(i, j - 1))) {
+                    NMS(i - 1, j - 1) = 0;
+                } else {
+                    NMS(i - 1, j - 1) = temp(i, j);
                 }
             }
         }
     }
-    M = temp.block(1, 1, rows, cols);
+    M = NMS;
 }
