@@ -55,5 +55,8 @@ int main() {
 //    ImageProcessor::ViewImage(dstImg);
     cv::Mat edge_detect;
     target_image->SobelDetector(edge_detect);
+
+    cv::imshow("M", edge_detect);
+    cv::waitKey(0);
 //    cv::imshow("The edge", edge_detect);
 }

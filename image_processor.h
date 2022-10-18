@@ -53,7 +53,6 @@ public:
 
     void AddNoise(const double mean, const double sigma, const double dis);
 
-    // TODO 更改函数格式，使用template
     void MyGaussFilter(const Eigen::Matrix3d &filter_core);
 
     void MiddleFilter(cv::Mat &srcImg, cv::Mat &dstImg);

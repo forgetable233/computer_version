@@ -273,12 +273,11 @@ double ImageProcessor::GetMiddleValue(Eigen::Matrix3d &matrix) {
 void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
     int rows = this->grey_image_.rows;
     int cols = this->grey_image_.cols;
-//    dstImg.resize(rows, cols);
     Eigen::MatrixXd eigen_grey;
     Eigen::MatrixXd round_eigen(rows + 2, cols + 2);
-    Eigen::MatrixXd dx(rows, cols);
-    Eigen::MatrixXd dy(rows, cols);
-    Eigen::MatrixXd M(rows, cols);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> dx(rows, cols);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> dy(rows, cols);
+    Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> M(rows, cols);
     Eigen::MatrixXd angle(rows, cols);
     Eigen::Matrix3d sobel_x;
     Eigen::Matrix3d sobel_y;
@@ -299,8 +298,8 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
             dx(i - 1, j - 1) = Convolution(sobel_x, temp);
             dy(i - 1, j - 1) = Convolution(sobel_y, temp);
-//            M(i - 1, j - 1) = sqrt(pow(dx(i - 1, j - 1), 2) + pow(dy(i - 1, j - 1), 2));
-            M(i - 1, j - 1) = sqrt(dx(i - 1, j - 1) * dx(i - 1, j - 1) + dy(i - 1, j - 1) * dy(i - 1, j - 1));
+            M(i - 1, j - 1) = static_cast<uchar>(sqrt(
+                    dx(i - 1, j - 1) * dx(i - 1, j - 1) + dy(i - 1, j - 1) * dy(i - 1, j - 1)));
             if (max < M(i - 1, j - 1)) {
                 max = M(i - 1, j - 1);
             }
@@ -310,29 +309,29 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
         }
     }
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            M(i, j) /= max - min;
-        }
-    }
-
-    cv::Mat M_cv;
-    cv::eigen2cv(M, M_cv);
-    std::cout << M_cv << std::endl;
-    cv::imshow("M", M_cv);
+    cv::Mat d_x_mat;
+    cv::Mat d_y_mat;
+    cv::eigen2cv(dx, d_x_mat);
+    cv::eigen2cv(dy, d_y_mat);
+    d_x_mat.convertTo(d_x_mat, CV_8UC1);
+    d_y_mat.convertTo(d_y_mat, CV_8UC1);
+    cv::imshow("d_x", d_x_mat);
+    cv::waitKey(0);
+    cv::imshow("d_y", d_y_mat);
     cv::waitKey(0);
 
+    cv::eigen2cv(M, dstImg);
 //    NMS(M, angle);
 }
 
-void ImageProcessor::NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle) {
-    const long int rows = M.rows();
-    const long int cols = angle.cols();
-    Eigen::MatrixXd temp(rows + 2, cols + 2);
-    temp.block(1, 1, rows, cols) = M;
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-
-        }
-    }
-}
+//void ImageProcessor::NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle) {
+//    const long int rows = M.rows();
+//    const long int cols = angle.cols();
+//    Eigen::MatrixXd temp(rows + 2, cols + 2);
+//    temp.block(1, 1, rows, cols) = M;
+//    for (int i = 0; i < rows; ++i) {
+//        for (int j = 0; j < cols; ++j) {
+//
+//        }
+//    }
+//}
