@@ -80,10 +80,14 @@ void ImageProcessor::ResizeImage(int row, int cols) {
                 int x2 = floor((i + 1) * row_jump);
                 int y2 = floor((j + 1) * cols_jump);
                 resized_image_.at<cv::Vec3b>(i, j) =
-                        image_.at<cv::Vec3b>(x1, y1) * (x2 % image_.rows - i * row_jump) * (y2 % image_.cols - j * cols_jump) +
-                        image_.at<cv::Vec3b>(x2 % image_.rows, y1) * (i * row_jump - x1) * (y2 % image_.cols - j * cols_jump) +
-                        image_.at<cv::Vec3b>(x1, y2 % image_.cols) * (x2 % image_.rows - i * row_jump) * (j * cols_jump - y1) +
-                        image_.at<cv::Vec3b>(x2 % image_.rows, y2 % image_.cols) * (i * row_jump - x1) * (j * cols_jump - y1);
+                        image_.at<cv::Vec3b>(x1, y1) * (x2 % image_.rows - i * row_jump) *
+                        (y2 % image_.cols - j * cols_jump) +
+                        image_.at<cv::Vec3b>(x2 % image_.rows, y1) * (i * row_jump - x1) *
+                        (y2 % image_.cols - j * cols_jump) +
+                        image_.at<cv::Vec3b>(x1, y2 % image_.cols) * (x2 % image_.rows - i * row_jump) *
+                        (j * cols_jump - y1) +
+                        image_.at<cv::Vec3b>(x2 % image_.rows, y2 % image_.cols) * (i * row_jump - x1) *
+                        (j * cols_jump - y1);
             }
         }
     }
@@ -91,7 +95,6 @@ void ImageProcessor::ResizeImage(int row, int cols) {
     std::cout << "==============================================================" << std::endl;
     std::cout << "Have finished the resize of the image" << std::endl;
     std::cout << "==============================================================" << std::endl << std::endl;
-    ViewImage(RESIZED);
 }
 
 /**
@@ -306,8 +309,6 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             -2, 0, 2,
             -1, 0, 1;
 
-    double max = 0;
-    double min = MAXFLOAT;
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
             Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
@@ -315,12 +316,6 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             dy(i - 1, j - 1) = Convolution(sobel_y, temp);
             M(i - 1, j - 1) = static_cast<uchar>(sqrt(
                     dx(i - 1, j - 1) * dx(i - 1, j - 1) + dy(i - 1, j - 1) * dy(i - 1, j - 1)));
-            if (max < M(i - 1, j - 1)) {
-                max = M(i - 1, j - 1);
-            }
-            if (min > M(i - 1, j - 1)) {
-                min = M(i - 1, j - 1);
-            }
             angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
         }
     }
@@ -330,23 +325,45 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
     cv::eigen2cv(dy, d_y_mat);
     d_x_mat.convertTo(d_x_mat, CV_8UC1);
     d_y_mat.convertTo(d_y_mat, CV_8UC1);
-    cv::imshow("d_x", d_x_mat);
-    cv::waitKey(0);
-    cv::imshow("d_y", d_y_mat);
-    cv::waitKey(0);
-
+//    cv::imshow("d_x", d_x_mat);
+//    cv::waitKey(0);
+//    cv::imshow("d_y", d_y_mat);
+//    cv::waitKey(0);
+//    cv::Mat temp_M;
+//    cv::eigen2cv(M, temp_M);
+//    cv::imshow("test", temp_M);
+//    cv::waitKey(0);
+    NMS(M, angle);
     cv::eigen2cv(M, dstImg);
-//    NMS(M, angle);
 }
 
-//void ImageProcessor::NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle) {
-//    const long int rows = M.rows();
-//    const long int cols = angle.cols();
-//    Eigen::MatrixXd temp(rows + 2, cols + 2);
-//    temp.block(1, 1, rows, cols) = M;
-//    for (int i = 0; i < rows; ++i) {
-//        for (int j = 0; j < cols; ++j) {
-//
-//        }
-//    }
-//}
+void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle) {
+    const long int rows = M.rows();
+    const long int cols = angle.cols();
+    std::cout << M.rows() << ' ' << M.cols() << std::endl;
+    Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> temp(rows + 2, cols + 2);
+    std::cout << temp.rows() << ' ' << temp.cols() << std::endl;
+    temp.block(1, 1, rows, cols) = M;
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            if (angle(i - 1, j - 1) >= -M_PI * (3 / 8) && angle(i - 1, j - 1) < -M_PI / 8) {
+                if (!(temp(i, j) > temp(i - 1, j - 1) && temp(i, j) > temp(i + 1, j + 1))) {
+                    temp(i, j) = 0;
+                }
+            } else if (angle(i - 1, j - 1) >= -M_PI / 8 && angle(i - 1, j - 1) < M_PI / 8) {
+                if (!(temp(i, j) > temp(i, j - 1) && temp(i, j) > temp(i, j + 1))) {
+                    temp(i, j) = 0;
+                }
+            } else if (angle(i - 1, j - 1) >= M_PI / 8 && angle(i - 1, j - 1) < M_PI * (3 / 8)) {
+                if (!(temp(i, j) > temp(i + 1, j - 1) && temp(i, j) > temp(i - 1, j + 1))) {
+                    temp(i, j) = 0;
+                }
+            } else {
+                if (!(temp(i, j) > temp(i, j + 1) && temp(i, j) > temp(i, j - 1))) {
+                    temp(i, j) = 0;
+                }
+            }
+        }
+    }
+    M = temp.block(1, 1, rows, cols);
+}

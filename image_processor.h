@@ -69,7 +69,7 @@ public:
 
     void SobelDetector(cv::Mat &dstImg);
 
-    void NMS(Eigen::MatrixXd &M, Eigen::MatrixXd &angle);
+    void NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle);
 };
 
 
