@@ -58,25 +58,40 @@ void ImageProcessor::ViewImage(ImageChoose choose) {
  * @param cols
  */
 void ImageProcessor::ResizeImage(int row, int cols) {
+    cv::Mat temp_resized_image(cv::Size(row, cols), CV_8UC3);
+    temp_resized_image.copyTo(resized_image_);
+    double row_jump = static_cast<double>(image_.rows) / row;
+    double cols_jump = static_cast<double>(image_.cols) / cols;
     if (row <= image_.rows && cols <= image_.cols) {
-        cv::Mat temp_resized_image(cv::Size(512, 512), CV_8UC3);
-        temp_resized_image.copyTo(resized_image_);
-        double row_jump = static_cast<double>(image_.rows) / row;
-        double cols_jump = static_cast<double>(image_.cols) / cols;
-
+        /** x，y都进行缩小操作 **/
         for (int i = 0; i < row; ++i) {
             for (int j = 0; j < cols; ++j) {
                 resized_image_.at<cv::Vec3b>(i, j) =
                         image_.at<cv::Vec3b>(static_cast<int>(i * row_jump), static_cast<int>(j * cols_jump));
             }
         }
-        finished_resize_ = true;
-        std::cout << "==============================================================" << std::endl;
-        std::cout << "Have finished the resize of the image" << std::endl;
-        std::cout << "==============================================================" << std::endl << std::endl;
-    } else {
-        std::cerr << "The target rows and columns are too large" << std::endl;
+    } else if (row > image_.rows && cols > image_.cols) {
+        /** 利用双线性插值进行图像的放大 **/
+        for (int i = 0; i < row; ++i) {
+            for (int j = 0; j < cols; ++j) {
+                /** 下面的各个x，y为在原图下的 **/
+                int x1 = floor(i * row_jump);
+                int y1 = floor(j * cols_jump);
+                int x2 = floor((i + 1) * row_jump);
+                int y2 = floor((j + 1) * cols_jump);
+                resized_image_.at<cv::Vec3b>(i, j) =
+                        image_.at<cv::Vec3b>(x1, y1) * (x2 % image_.rows - i * row_jump) * (y2 % image_.cols - j * cols_jump) +
+                        image_.at<cv::Vec3b>(x2 % image_.rows, y1) * (i * row_jump - x1) * (y2 % image_.cols - j * cols_jump) +
+                        image_.at<cv::Vec3b>(x1, y2 % image_.cols) * (x2 % image_.rows - i * row_jump) * (j * cols_jump - y1) +
+                        image_.at<cv::Vec3b>(x2 % image_.rows, y2 % image_.cols) * (i * row_jump - x1) * (j * cols_jump - y1);
+            }
+        }
     }
+    finished_resize_ = true;
+    std::cout << "==============================================================" << std::endl;
+    std::cout << "Have finished the resize of the image" << std::endl;
+    std::cout << "==============================================================" << std::endl << std::endl;
+    ViewImage(RESIZED);
 }
 
 /**

@@ -16,9 +16,13 @@
 
 int main() {
     std::string file_path = "../picture.jpg";
+    int rows, cols;
 
     auto target_image = new ImageProcessor(file_path);
-    target_image->ResizeImage(512, 512);
+    std::cout << "Please input the target image size" << std::endl;
+    std::cin >> rows >> cols;
+    std::cout << "Begin to process the image" << std::endl;
+    target_image->ResizeImage(rows, cols);
     target_image->CvtToGray();
     target_image->AddNoise(0, std::sqrt(10), 0.1);
 
@@ -58,5 +62,4 @@ int main() {
 
     cv::imshow("M", edge_detect);
     cv::waitKey(0);
-//    cv::imshow("The edge", edge_detect);
 }
