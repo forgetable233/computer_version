@@ -115,6 +115,7 @@ void ImageProcessor::CvtToGray() {
                     static_cast<double>(resized_image_.at<cv::Vec3b>(i, j)[2]) * 0.3);
         }
     }
+
     std::cout << "==============================================================" << std::endl;
     std::cout << "完成灰度图转化" << std::endl;
     std::cout << "==============================================================" << std::endl << std::endl;
@@ -161,7 +162,7 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
  * 高斯滤波函数，输入对应的卷积核
  * @param filter_core
  */
-void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
+void ImageProcessor::MyGaussFilter(const Eigen::MatrixXd &filter_core) {
     if (!noise_added_) {
         std::cerr << "没有完成图像噪声的添加" << std::endl;
         return;
@@ -169,26 +170,26 @@ void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     const int rows = gaussian_noise_image_.rows;
     const int cols = gaussian_noise_image_.cols;
 
-    Eigen::MatrixXd gaussian_matrix(rows + 2, cols + 2);
-    Eigen::MatrixXd salt_matrix(rows + 2, cols + 2);
+    Eigen::MatrixXd gaussian_matrix(rows + 8, cols + 8);
+    Eigen::MatrixXd salt_matrix(rows + 8, cols + 8);
     Eigen::MatrixXd mat2eigen(rows, cols);
     Eigen::MatrixXd gaussian_result_matrix(rows, cols);
     Eigen::MatrixXd salt_result_matrix(rows, cols);
-    Eigen::Matrix3d temp_matrix;
+    Eigen::MatrixXd temp_matrix(9, 9);
 
     cv::cv2eigen(gaussian_noise_image_, mat2eigen);
-    gaussian_matrix.block(1, 1, rows, cols) = mat2eigen;
+    gaussian_matrix.block(4, 4, rows, cols) = mat2eigen;
     cv::cv2eigen(salt_pepper_noise_image_, mat2eigen);
-    salt_matrix.block(1, 1, rows, cols) = mat2eigen;
+    salt_matrix.block(4, 4, rows, cols) = mat2eigen;
 
-    for (int i = 1; i < rows + 1; ++i) {
-        for (int j = 1; j < cols + 1; ++j) {
+    for (int i = 4; i < rows + 4; ++i) {
+        for (int j = 4; j < cols + 4; ++j) {
             /** 首先进行高斯的卷积 **/
-            temp_matrix = gaussian_matrix.block<3, 3>(i - 1, j - 1);
-            gaussian_result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+            temp_matrix = gaussian_matrix.block<9, 9>(i - 4, j - 4);
+            gaussian_result_matrix(i - 4, j - 4) = Convolution(filter_core, temp_matrix);
             /** 下面进行盐椒的卷积 **/
-            temp_matrix = salt_matrix.block<3, 3>(i - 1, j - 1);
-            salt_result_matrix(i - 1, j - 1) = Convolution(filter_core, temp_matrix);
+            temp_matrix = salt_matrix.block<9, 9>(i - 4, j - 4);
+            salt_result_matrix(i - 4, j - 4) = Convolution(filter_core, temp_matrix);
         }
     }
     cv::eigen2cv(gaussian_result_matrix, gaussian_filtered_image_);
@@ -197,16 +198,43 @@ void ImageProcessor::MyGaussFilter(const Eigen::Matrix3d &filter_core) {
     salt_pepper_filtered_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
 }
 
+void my_Gauss_filter(cv::Mat &srcImg, const Eigen::MatrixXd &filter_corre, cv::Mat &dstImg) {
+    const int rows = srcImg.rows;
+    const int cols = srcImg.cols;
+
+    Eigen::MatrixXd gaussian_matrix(rows + 8, cols + 8);
+    Eigen::MatrixXd mat2eigen(rows, cols);
+    Eigen::MatrixXd result(rows, cols);
+    Eigen::MatrixXd temp_matrix(9, 9);
+
+    cv::cv2eigen(srcImg, mat2eigen);
+    gaussian_matrix.block(4, 4, rows, cols) = mat2eigen;
+
+    for (int i = 4; i < rows + 4; ++i) {
+        for (int j = 4; j < cols + 4; ++j) {
+            temp_matrix = gaussian_matrix.block<9, 9>(i - 4, j - 4);
+//            result(i - 4, j - 4) = Convolution(filter_corre, temp_matrix);
+        }
+    }
+    cv::eigen2cv(result, dstImg);
+}
+
 /**
  * 进行卷积操作，得出卷积结果
  * @param core
  * @param matrix
  * @return
  */
-double ImageProcessor::Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix) {
+double ImageProcessor::Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix) {
     double re = 0;
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
+    if (matrix.rows() != core.rows() || matrix.cols() != core.cols()) {
+        std::cerr << "The size doesn't match" << std::endl;
+        std::cout << matrix.rows() << ' ' << core.rows() << ' ' << matrix.cols() << ' ' << core.cols() << std::endl;
+    }
+    const int rows = static_cast<int>(matrix.rows());
+    const int cols = static_cast<int>(matrix.cols());
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
             re += core(i, j) * matrix(i, j);
         }
     }
@@ -310,14 +338,13 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             -1, 0, 1;
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
-            Eigen::Matrix3d temp = round_eigen.block<3, 3>(i - 1, j - 1);
+            Eigen::MatrixXd temp = round_eigen.block<3, 3>(i - 1, j - 1);
             dx(i - 1, j - 1) = Convolution(sobel_x, temp);
             dy(i - 1, j - 1) = Convolution(sobel_y, temp);
             int temp_x = (int) dx(i - 1, j - 1) * (int) dx(i - 1, j - 1);
             int temp_y = (int) dy(i - 1, j - 1) * (int) dy(i - 1, j - 1);
-            int temp_re = static_cast<int >(
-                    sqrt(temp_x + temp_y));
-            if (temp_re > 255)  {
+            int temp_re = static_cast<int >(sqrt(temp_x + temp_y));
+            if (temp_re > 255) {
                 M(i - 1, j - 1) = 255;
             } else {
                 M(i - 1, j - 1) = temp_re;
@@ -325,35 +352,35 @@ void ImageProcessor::SobelDetector(cv::Mat &dstImg) {
             angle(i - 1, j - 1) = atan(dy(i - 1, j - 1) / dx(i - 1, j - 1));
         }
     }
-    cv::Mat d_x_mat;
-    cv::Mat d_y_mat;
-    cv::eigen2cv(dx, d_x_mat);
-    cv::eigen2cv(dy, d_y_mat);
-    d_x_mat.convertTo(d_x_mat, CV_8UC1);
-    d_y_mat.convertTo(d_y_mat, CV_8UC1);
-    cv::imshow("d_x", d_x_mat);
-    cv::waitKey(0);
-    cv::imshow("d_y", d_y_mat);
-    cv::waitKey(0);
-    cv::Mat temp_M;
-    cv::eigen2cv(M, temp_M);
-    cv::imshow("test", temp_M);
-    cv::waitKey(0);
-    NMS(M, angle);
-    cv::eigen2cv(M, dstImg);
+//    cv::Mat d_x_mat;
+//    cv::Mat d_y_mat;
+//    cv::eigen2cv(dx, d_x_mat);
+//    cv::eigen2cv(dy, d_y_mat);
+//    d_x_mat.convertTo(d_x_mat, CV_8UC1);
+//    d_y_mat.convertTo(d_y_mat, CV_8UC1);
+//    cv::imshow("d_x", d_x_mat);
+//    cv::waitKey(0);
+//    cv::imshow("d_y", d_y_mat);
+//    cv::waitKey(0);
+//    cv::Mat temp_M;
+//    cv::eigen2cv(M, temp_M);
+//    cv::imshow("test", temp_M);
+//    cv::waitKey(0);
+//    NMS(M, angle);
+//    cv::eigen2cv(M, dstImg);
 
-//    cv::Mat opencv_sobel;
-//    cv::Mat opencv_x;
-//    cv::Mat opencv_y;
-//    cv::Sobel(this->grey_image_, opencv_x, CV_8UC1, 1, 0);
-//    cv::imshow("opencv x", opencv_x);
-//    cv::waitKey(0);
-//    cv::Sobel(this->grey_image_, opencv_y, CV_8UC1, 0, 1);
-//    cv::imshow("opencv y", opencv_y);
-//    cv::waitKey(0);
-//    cv::addWeighted(opencv_x, 0.5, opencv_y, 0.5, 0, opencv_sobel);
-//    cv::imshow("opencv", opencv_sobel);
-//    cv::waitKey(0);
+    cv::Mat opencv_sobel;
+    cv::Mat opencv_x;
+    cv::Mat opencv_y;
+    cv::Sobel(this->grey_image_, opencv_x, CV_8UC1, 1, 0);
+    cv::imshow("opencv x", opencv_x);
+    cv::waitKey(0);
+    cv::Sobel(this->grey_image_, opencv_y, CV_8UC1, 0, 1);
+    cv::imshow("opencv y", opencv_y);
+    cv::waitKey(0);
+    cv::addWeighted(opencv_x, 0.5, opencv_y, 0.5, 0, opencv_sobel);
+    cv::imshow("opencv", opencv_sobel);
+    cv::waitKey(0);
 }
 
 void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle) {
@@ -394,4 +421,10 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
         }
     }
     M = NMS;
+    ViewImage(GRAY);
+    ViewImage(RESIZED);
+    ViewImage(GAUSSIAN_NOISE);
+    ViewImage(SALT_PEPPER_NOISE);
+    ViewImage(GAUSSIAN_FILTERED);
+    ViewImage(SALT_PEPPER_FILTERED);
 }

@@ -53,7 +53,7 @@ public:
 
     void AddNoise(const double mean, const double sigma, const double dis);
 
-    void MyGaussFilter(const Eigen::Matrix3d &filter_core);
+    void MyGaussFilter(const Eigen::MatrixXd &filter_core);
 
     void MiddleFilter(cv::Mat &srcImg, cv::Mat &dstImg);
 
@@ -61,7 +61,7 @@ public:
 
     void GetSaltImage(cv::Mat &dst_img);
 
-    static double Convolution(const Eigen::Matrix3d &core, Eigen::Matrix3d &matrix);
+    static double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix);
 
     double ComputeSNR(int choose);
 
