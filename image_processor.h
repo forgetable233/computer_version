@@ -7,6 +7,7 @@
 #include <random>
 #include <cmath>
 #include <vector>
+#include <thread>
 
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
@@ -16,6 +17,9 @@
 
 #ifndef COMPUTER_VISION_IMAGE_PROCESSOR_H
 #define COMPUTER_VISION_IMAGE_PROCESSOR_H
+#define ALPHA 0.004
+#define THREAD_NUM 16
+//#define THREHOLD
 
 enum ImageChoose {
     ORIGIN,
@@ -62,7 +66,9 @@ public:
 
     void GetSaltImage(cv::Mat &dst_img);
 
-    static double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix);
+    static inline double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix);
+
+    static inline double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &homo_mat, int i, int j);
 
     double ComputeSNR(int choose);
 
@@ -72,7 +78,12 @@ public:
 
     void NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle);
 
-    static void HarrisDetector(cv::Mat &srcImg, std::vector<cv::Point2i> &key_points, std::vector<cv::Mat> &features);
+    static void CreateGaussianCore(double mean, double sigma, Eigen::MatrixXd &core);
+
+    static void
+    HarrisDetector(cv::Mat &srcImg, std::vector<cv::Point2i> &feature_points, std::vector<cv::Mat> &features);
+
+    static bool IsMax(Eigen::Matrix3d &matrix);
 };
 
 

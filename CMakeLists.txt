@@ -8,4 +8,4 @@ find_package(Eigen3 CONFIG REQUIRED)
 
 add_executable(cv main.cpp image_processor.cpp image_processor.h)
 
-target_link_libraries(cv PRIVATE ${OpenCV_LIBS} Eigen3::Eigen)
+target_link_libraries(cv PRIVATE ${OpenCV_LIBS} Eigen3::Eigen -lpthread -lm)

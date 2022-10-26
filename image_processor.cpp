@@ -247,6 +247,18 @@ double ImageProcessor::Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd 
     return re;
 }
 
+double ImageProcessor::Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &homo_mat, int i, int j) {
+    const int rows = static_cast<int>(core.rows());
+    const int cols = static_cast<int>(core.cols());
+    double re = 0;
+    for (int k = 0; k < rows; ++k) {
+        for (int l = 0; l < cols; ++l) {
+            re += core(k, l) * homo_mat(i - 1 + k, j - 1 + l);
+        }
+    }
+    return re;
+}
+
 /**
  * 计算SNR，用来判断滤波效果
  * @param choose
@@ -458,13 +470,98 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
 }
 
 void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
-                                    std::vector<cv::Point2i> &key_points,
+                                    std::vector<cv::Point2i> &feature_points,
                                     std::vector<cv::Mat> &features) {
     const int rows = srcImg.rows;
     const int cols = srcImg.cols;
 
     cv::Mat grey_img;
     cv::cvtColor(srcImg, grey_img, cv::COLOR_BGR2GRAY);
-    Eigen::Matrix<u_char, Eigen::Dynamic, Eigen::Dynamic> src_img(rows, cols);
+    /** 转化成eigen好操作 **/
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> src_img(rows, cols);
+    Eigen::Matrix3d dy;
+    Eigen::Matrix3d dx;
+    Eigen::MatrixXd gaussian(3, 3);
+    Eigen::MatrixXd Ix(rows + 2, cols + 2);
+    Eigen::MatrixXd Iy(rows + 2, cols + 2);
+    Eigen::MatrixXd Ixy(rows + 2, cols + 2);
+    Eigen::MatrixXd R(rows, cols);
+    Eigen::MatrixXd homo_mat(rows + 2, cols + 2);
+
+    Eigen::MatrixXd M(rows, cols);
+
     cv::cv2eigen(grey_img, src_img);
+    homo_mat.block(1, 1, rows, cols) = src_img;
+    dy << -1, 0, 1,
+            -1, 0, 1,
+            -1, 0, 1;
+    dx << -1, -1, -1,
+            0, 0, 0,
+            1, 1, 1;
+    CreateGaussianCore(0, 1, gaussian);
+    std::vector<std::thread> threads;
+    const int task_num = static_cast<int>(homo_mat.rows());
+    const int avg_num = task_num / THREAD_NUM;
+    std::cout << avg_num << std::endl;
+    /** 计算Ix， Iy， Ixy **/
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        threads.emplace_back([i, avg_num, cols, &Ix, &Iy, &Ixy, &dx, &dy, &homo_mat]() {
+            int count = 0;
+            for (int j = i * avg_num + 1; j < (i + 1) * avg_num + 1; ++j) {
+                std::cout << count++ << std::endl;
+                for (int t = 1; t < cols + 1; ++t) {
+                    Ix(j, t) = Convolution(dx, homo_mat, j, t);
+                    Iy(j, t) = Convolution(dy, homo_mat, j, t);
+                    Ixy(j, t) = Ix(j, t) * Iy(j, t);
+                    Ix(j, t) *= Ix(j, t), Iy *= Iy(j, t);
+                }
+            }
+        });
+    }
+    for (auto &t : threads) {
+        t.join();
+    }
+
+    for (int i = 1; i < rows + 1; ++i) {
+        for (int j = 1; j < cols + 1; ++j) {
+            double A, B, C;
+            A = Convolution(gaussian, Ix, i, j);
+            B = Convolution(gaussian, Iy, i, j);
+            C = Convolution(gaussian, Ixy, i, j);
+            R(i - 1, j - 1) = (A * B - C * C) - ALPHA * (A * C);
+        }
+    }
+    /** 进行NMS **/
+    for (int i = 1; i < rows - 1; ++i) {
+        for (int j = 1; j < cols - 1; ++j) {
+            Eigen::Matrix3d temp = R.block<3, 3>(i - 1, j - 1);
+            if (IsMax(temp)) {
+                feature_points.emplace_back(i, j);
+            }
+        }
+    }
+    std::cout << "Finish harris detect" << std::endl;
+    std::cout << "Have detected " << feature_points.size() << " points" << std::endl;
+}
+
+void ImageProcessor::CreateGaussianCore(double mean, double sigma, Eigen::MatrixXd &core) {
+    const int rows = static_cast<int>(core.rows());
+    const int cols = static_cast<int>(core.cols());
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            core(i, j) = (1 / (2 * M_PI * sigma * sigma)) *
+                         exp(-(pow(i - rows / 2, 2) + pow(j - cols / 2, 2)) / (2 * sigma * sigma));
+        }
+    }
+    /** 归一化 **/
+    core /= core.sum();
+}
+
+bool ImageProcessor::IsMax(Eigen::Matrix3d &matrix) {
+    if (matrix(1, 1) > matrix(0, 0) && matrix(1, 1) > matrix(0, 1) && matrix(1, 1) > matrix(0, 2) &&
+        matrix(1, 1) > matrix(1, 0) && matrix(1, 1) > matrix(1, 2) &&
+        matrix(1, 1) > matrix(2, 0) && matrix(1, 1) > matrix(2, 1) && matrix(1, 1) > matrix(2, 2)) {
+        return true;
+    }
+    return false;
 }
