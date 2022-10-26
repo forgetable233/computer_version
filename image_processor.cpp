@@ -134,6 +134,7 @@ void ImageProcessor::AddNoise(const double mean, const double sigma, const doubl
 
     std::default_random_engine generator;
     std::normal_distribution<double> distribution(mean, sigma);
+    gaussian_noise_image_ /= 255;
 
     for (int i = 0; i < grey_image_.rows; ++i) {
         for (int j = 0; j < grey_image_.cols; ++j) {
@@ -173,8 +174,8 @@ void ImageProcessor::MyGaussFilter(const Eigen::MatrixXd &filter_core) {
     Eigen::MatrixXd gaussian_matrix(rows + 8, cols + 8);
     Eigen::MatrixXd salt_matrix(rows + 8, cols + 8);
     Eigen::MatrixXd mat2eigen(rows, cols);
-    Eigen::MatrixXd gaussian_result_matrix(rows, cols);
-    Eigen::MatrixXd salt_result_matrix(rows, cols);
+    Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> gaussian_result_matrix(rows, cols);
+    Eigen::Matrix<uchar, Eigen::Dynamic, Eigen::Dynamic> salt_result_matrix(rows, cols);
     Eigen::MatrixXd temp_matrix(9, 9);
 
     cv::cv2eigen(gaussian_noise_image_, mat2eigen);
@@ -186,16 +187,21 @@ void ImageProcessor::MyGaussFilter(const Eigen::MatrixXd &filter_core) {
         for (int j = 4; j < cols + 4; ++j) {
             /** 首先进行高斯的卷积 **/
             temp_matrix = gaussian_matrix.block<9, 9>(i - 4, j - 4);
-            gaussian_result_matrix(i - 4, j - 4) = Convolution(filter_core, temp_matrix);
+            gaussian_result_matrix(i - 4, j - 4) = static_cast<uchar>(Convolution(filter_core, temp_matrix));
             /** 下面进行盐椒的卷积 **/
             temp_matrix = salt_matrix.block<9, 9>(i - 4, j - 4);
-            salt_result_matrix(i - 4, j - 4) = Convolution(filter_core, temp_matrix);
+            salt_result_matrix(i - 4, j - 4) = static_cast<uchar>(Convolution(filter_core, temp_matrix));
         }
     }
     cv::eigen2cv(gaussian_result_matrix, gaussian_filtered_image_);
     cv::eigen2cv(salt_result_matrix, salt_pepper_filtered_image_);
     gaussian_filtered_image_.convertTo(gaussian_filtered_image_, CV_8UC1);
     salt_pepper_filtered_image_.convertTo(salt_pepper_filtered_image_, CV_8UC1);
+//    cv::GaussianBlur(this->gaussian_noise_image_, this->gaussian_filtered_image_, cv::Size(9, 9), 1);
+//    cv::GaussianBlur(this->salt_pepper_noise_image_, this->salt_pepper_filtered_image_, cv::Size(9, 9), 1);
+//    ViewImage(GAUSSIAN_NOISE);
+//    ViewImage(GAUSSIAN_FILTERED);
+//    ViewImage(SALT_PEPPER_FILTERED);
 }
 
 void my_Gauss_filter(cv::Mat &srcImg, const Eigen::MatrixXd &filter_corre, cv::Mat &dstImg) {
@@ -250,12 +256,32 @@ double ImageProcessor::ComputeSNR(int choose) {
     Eigen::MatrixXd origin_image(resized_image_.rows, resized_image_.cols);
     Eigen::MatrixXd filtered_image(resized_image_.rows, resized_image_.cols);
     cv::cv2eigen(grey_image_, origin_image);
+    double sum = 0;
+    double sum2 = 0;
+    for (int i = 0; i < resized_image_.rows; ++i) {
+        for (int j = 0; j < resized_image_.cols; ++j) {
+            sum += static_cast<double>(pow(this->grey_image_.at<uchar>(i, j), 2));
+        }
+    }
     if (choose == 0) {
         cv::cv2eigen(gaussian_filtered_image_, filtered_image);
+//        std::cout << origin_image << std::endl;
+//        std::cout << origin_image - filtered_image << std::endl;
+        for (int i = 0; i < resized_image_.rows; ++i) {
+            for (int j = 0; j < resized_image_.cols; ++j) {
+                sum2 += static_cast<double>(pow(this->grey_image_.at<uchar>(i, j) - this->gaussian_filtered_image_.at<uchar>(i, j), 2));
+            }
+        }
     } else if (choose == 1) {
         cv::cv2eigen(salt_pepper_filtered_image_, filtered_image);
+        for (int i = 0; i < resized_image_.rows; ++i) {
+            for (int j = 0; j < resized_image_.cols; ++j) {
+                sum2 += static_cast<double>(pow(this->grey_image_.at<uchar>(i, j) - this->salt_pepper_filtered_image_.at<uchar>(i, j), 2));
+            }
+        }
     }
-    return 20 * log(origin_image.norm() / (origin_image - filtered_image).norm());
+    Eigen::MatrixXd temp = origin_image - filtered_image;
+    return 10 * log10(sum / sum2);
 }
 
 void ImageProcessor::GetGaussImage(cv::Mat &dst_img) {

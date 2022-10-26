@@ -24,42 +24,47 @@ int main() {
     std::cout << "Begin to process the image" << std::endl;
     target_image->ResizeImage(512, 512);
     target_image->CvtToGray();
-    target_image->AddNoise(0, std::sqrt(10), 0.1);
+    target_image->AddNoise(0, sqrt(10), 0.1);
 
-    Eigen::MatrixXd filter_core(9, 9);
     const double mean = 0.0;
-    double sigma = 2;
+    double sigma = 0.1;
     double sum = 0;
-    double SNR_1[20];
-    double SNR_2[20];
-//    for (int t = 0; t < 20; ++t) {
-//        std::cout << t << std::endl;
-//        /** 构建卷积核，此处为 mean = 0, sigma = 1 **/
-//        for (int i = 0; i < 9; ++i) {
-//            for (int j = 0; j < 9; ++j) {
-//                filter_core(i, j) = (1 / std::sqrt(2 * PI * sigma * sigma)) *
-//                                    exp(-pow((std::sqrt(pow(i - 1, 2) + pow(j - 1, 2) - mean)), 2) / (2 * sigma * sigma));
-//                sum += filter_core(i, j);
-//            }
-//        }
-//        /** 归一化 **/
+    double SNR_1[50] = {0};
+    double SNR_2[50] = {0};
+    for (int t = 0; t < 30; ++t) {
+        Eigen::MatrixXd filter_core(9, 9);
+        std::cout << t << std::endl;
+        sum = 0;
+        for (int i = 0; i < 9; ++i) {
+            for (int j = 0; j < 9; ++j) {
+                filter_core(i, j) = (1 / (2 * PI * sigma * sigma)) *
+                                    exp(-(pow(i - 4, 2) + pow(j - 4, 2)) / (2 * sigma * sigma));
+                sum += filter_core(i, j);
+            }
+        }
+        filter_core /= filter_core.sum();
+        /** 归一化 **/
 //        for (int i = 0; i < 9; ++i) {
 //            for (int j = 0; j < 9; ++j) {
 //                filter_core(i, j) = filter_core(i, j) / sum;
 //            }
 //        }
-//        sigma = sigma - 0.1;
-//        target_image->MyGaussFilter(filter_core);
-//        SNR_1[t] = target_image->ComputeSNR(0);
-//        SNR_2[t] = target_image->ComputeSNR(1);
-//    }
-//    for (int i = 0; i < 20; ++i) {
-//        std::cout << SNR_1[i] << ',';
-//    }
-//    std::cout << std::endl;
-//    for (int i = 0; i < 20; ++i) {
-//        std::cout << SNR_2[i] << ',';
-//    }
+        std::cout << "Core built" << std::endl;
+        sigma = sigma + 0.1;
+        target_image->MyGaussFilter(filter_core);
+        std::cout << "Finish filter" << std::endl;
+        SNR_1[t] = target_image->ComputeSNR(0);
+        SNR_2[t] = target_image->ComputeSNR(1);
+    }
+    for (int i = 0; i < 30; ++i) {
+        std::cout << SNR_1[i] << ',';
+    }
+    std::cout << std::endl;
+    for (int i = 0; i < 30; ++i) {
+        std::cout << SNR_2[i] << ',';
+    }
+    target_image->ViewImage(GAUSSIAN_FILTERED);
+    target_image->ViewImage(SALT_PEPPER_FILTERED);
 //    cv::Mat srcImg;
 //    cv::Mat dstImg;
 //    target_image->GetGaussImage(srcImg);
@@ -78,9 +83,9 @@ int main() {
 //    target_image->MiddleFilter(srcImg, dstImg);
 //    ImageProcessor::ViewImage(srcImg);
 //    ImageProcessor::ViewImage(dstImg);
-    cv::Mat edge_detect;
-    target_image->SobelDetector(edge_detect);
-
-    cv::imshow("M", edge_detect);
-    cv::waitKey(0);
+//    cv::Mat edge_detect;
+//    target_image->SobelDetector(edge_detect);
+//
+//    cv::imshow("M", edge_detect);
+//    cv::waitKey(0);
 }
