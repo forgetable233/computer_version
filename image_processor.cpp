@@ -247,18 +247,6 @@ double ImageProcessor::Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd 
     return re;
 }
 
-double ImageProcessor::Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &homo_mat, int i, int j) {
-    const int rows = static_cast<int>(core.rows());
-    const int cols = static_cast<int>(core.cols());
-    double re = 0;
-    for (int k = 0; k < rows; ++k) {
-        for (int l = 0; l < cols; ++l) {
-            re += core(k, l) * homo_mat(i - 1 + k, j - 1 + l);
-        }
-    }
-    return re;
-}
-
 /**
  * 计算SNR，用来判断滤波效果
  * @param choose
@@ -461,12 +449,12 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
         }
     }
     M = NMS;
-    ViewImage(GRAY);
-    ViewImage(RESIZED);
-    ViewImage(GAUSSIAN_NOISE);
-    ViewImage(SALT_PEPPER_NOISE);
-    ViewImage(GAUSSIAN_FILTERED);
-    ViewImage(SALT_PEPPER_FILTERED);
+//    ViewImage(GRAY);
+//    ViewImage(RESIZED);
+//    ViewImage(GAUSSIAN_NOISE);
+//    ViewImage(SALT_PEPPER_NOISE);
+//    ViewImage(GAUSSIAN_FILTERED);
+//    ViewImage(SALT_PEPPER_FILTERED);
 }
 
 void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
@@ -510,8 +498,8 @@ void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
             for (int j = i * avg_num + 1; j < (i + 1) * avg_num + 1; ++j) {
                 std::cout << count++ << std::endl;
                 for (int t = 1; t < cols + 1; ++t) {
-                    Ix(j, t) = Convolution(dx, homo_mat, j, t);
-                    Iy(j, t) = Convolution(dy, homo_mat, j, t);
+                    Ix(j, t) = (dx.array() * homo_mat.block<3, 3>(j - 1, t - 1).array()).sum();
+                    Iy(j, t) = (dy.array() * homo_mat.block<3, 3>(j - 1, t - 1).array()).sum();
                     Ixy(j, t) = Ix(j, t) * Iy(j, t);
                     Ix(j, t) *= Ix(j, t), Iy *= Iy(j, t);
                 }
@@ -525,17 +513,17 @@ void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
             double A, B, C;
-            A = Convolution(gaussian, Ix, i, j);
-            B = Convolution(gaussian, Iy, i, j);
-            C = Convolution(gaussian, Ixy, i, j);
+            A = (gaussian.array() * Ix.block<3, 3>(i - 1, j - 1).array()).sum();
+            B = (gaussian.array() * Iy.block<3, 3>(i - 1, j - 1).array()).sum();
+            C = (gaussian.array() * Ixy.block<3, 3>(i - 1, j - 1).array()).sum();
             R(i - 1, j - 1) = (A * B - C * C) - ALPHA * (A * C);
         }
     }
     /** 进行NMS **/
     for (int i = 1; i < rows - 1; ++i) {
         for (int j = 1; j < cols - 1; ++j) {
-            Eigen::Matrix3d temp = R.block<3, 3>(i - 1, j - 1);
-            if (IsMax(temp)) {
+            double max = R.block<3, 3>(i - 1, j - 1).maxCoeff();
+            if (max == R(i, j) && R(i, j) > THRESHOLD) {
                 feature_points.emplace_back(i, j);
             }
         }
@@ -555,13 +543,4 @@ void ImageProcessor::CreateGaussianCore(double mean, double sigma, Eigen::Matrix
     }
     /** 归一化 **/
     core /= core.sum();
-}
-
-bool ImageProcessor::IsMax(Eigen::Matrix3d &matrix) {
-    if (matrix(1, 1) > matrix(0, 0) && matrix(1, 1) > matrix(0, 1) && matrix(1, 1) > matrix(0, 2) &&
-        matrix(1, 1) > matrix(1, 0) && matrix(1, 1) > matrix(1, 2) &&
-        matrix(1, 1) > matrix(2, 0) && matrix(1, 1) > matrix(2, 1) && matrix(1, 1) > matrix(2, 2)) {
-        return true;
-    }
-    return false;
 }

@@ -19,7 +19,7 @@
 #define COMPUTER_VISION_IMAGE_PROCESSOR_H
 #define ALPHA 0.004
 #define THREAD_NUM 16
-//#define THREHOLD
+#define THRESHOLD 1
 
 enum ImageChoose {
     ORIGIN,
@@ -68,8 +68,6 @@ public:
 
     static inline double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix);
 
-    static inline double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &homo_mat, int i, int j);
-
     double ComputeSNR(int choose);
 
     static inline double GetMiddleValue(Eigen::Matrix3d &matrix);
@@ -82,8 +80,6 @@ public:
 
     static void
     HarrisDetector(cv::Mat &srcImg, std::vector<cv::Point2i> &feature_points, std::vector<cv::Mat> &features);
-
-    static bool IsMax(Eigen::Matrix3d &matrix);
 };
 
 
