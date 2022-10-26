@@ -6,6 +6,7 @@
 #include <string>
 #include <random>
 #include <cmath>
+#include <vector>
 
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
@@ -70,6 +71,8 @@ public:
     void SobelDetector(cv::Mat &dstImg);
 
     void NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle);
+
+    static void HarrisDetector(cv::Mat &srcImg, std::vector<cv::Point2i> &key_points, std::vector<cv::Mat> &features);
 };
 
 

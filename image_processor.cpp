@@ -269,14 +269,16 @@ double ImageProcessor::ComputeSNR(int choose) {
 //        std::cout << origin_image - filtered_image << std::endl;
         for (int i = 0; i < resized_image_.rows; ++i) {
             for (int j = 0; j < resized_image_.cols; ++j) {
-                sum2 += static_cast<double>(pow(this->grey_image_.at<uchar>(i, j) - this->gaussian_filtered_image_.at<uchar>(i, j), 2));
+                sum2 += static_cast<double>(pow(
+                        this->grey_image_.at<uchar>(i, j) - this->gaussian_filtered_image_.at<uchar>(i, j), 2));
             }
         }
     } else if (choose == 1) {
         cv::cv2eigen(salt_pepper_filtered_image_, filtered_image);
         for (int i = 0; i < resized_image_.rows; ++i) {
             for (int j = 0; j < resized_image_.cols; ++j) {
-                sum2 += static_cast<double>(pow(this->grey_image_.at<uchar>(i, j) - this->salt_pepper_filtered_image_.at<uchar>(i, j), 2));
+                sum2 += static_cast<double>(pow(
+                        this->grey_image_.at<uchar>(i, j) - this->salt_pepper_filtered_image_.at<uchar>(i, j), 2));
             }
         }
     }
@@ -453,4 +455,16 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
     ViewImage(SALT_PEPPER_NOISE);
     ViewImage(GAUSSIAN_FILTERED);
     ViewImage(SALT_PEPPER_FILTERED);
+}
+
+void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
+                                    std::vector<cv::Point2i> &key_points,
+                                    std::vector<cv::Mat> &features) {
+    const int rows = srcImg.rows;
+    const int cols = srcImg.cols;
+
+    cv::Mat grey_img;
+    cv::cvtColor(srcImg, grey_img, cv::COLOR_BGR2GRAY);
+    Eigen::Matrix<u_char, Eigen::Dynamic, Eigen::Dynamic> src_img(rows, cols);
+    cv::cv2eigen(grey_img, src_img);
 }
