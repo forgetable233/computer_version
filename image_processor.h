@@ -82,6 +82,8 @@ public:
 
     static void
     HarrisDetector(cv::Mat &srcImg, std::vector<cv::Point2i> &feature_points, std::vector<cv::Mat> &features);
+
+    static void CameraCalibration(cv::Mat &input_image);
 };
 
 

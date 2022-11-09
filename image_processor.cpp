@@ -565,3 +565,41 @@ bool ImageProcessor::isMax(Eigen::Matrix3d &tar) {
     }
     return true;
 }
+
+std::vector<Eigen::Vector2d> image_points;
+void on_MouseHandle(int event, int x, int y, int flag, void *param) {
+    cv::Mat image = *(cv::Mat*) param;
+//    std::vector<Eigen::Vector2d> image_points = *(std::vector<Eigen::Vector2d> *) param;
+    switch (event) {
+        case cv::EVENT_FLAG_LBUTTON:
+            image_points.emplace_back(x, y);
+            cv::circle(image, cv::Point(x, y), 2, cv::Scalar(0, 0, 255), 2, 8, 0);
+            std::cout << image_points.back().x() << ' ' << image_points.back().y() << std::endl;
+
+    }
+}
+
+void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
+    std::vector<Eigen::Vector3d> world_points = {Eigen::Vector3d{7, 7, 0},
+                                                 Eigen::Vector3d{14, 7, 0},
+                                                 Eigen::Vector3d{7, 14, 0},
+                                                 Eigen::Vector3d{14, 14, 0},
+                                                 Eigen::Vector3d{7, 0, 7},
+                                                 Eigen::Vector3d{14, 0, 7},
+                                                 Eigen::Vector3d{7, 0, 14},
+                                                 Eigen::Vector3d{14, 0, 14},
+                                                 Eigen::Vector3d{0, 7, 7},
+                                                 Eigen::Vector3d{0, 14, 7},
+                                                 Eigen::Vector3d{0, 7, 14},
+                                                 Eigen::Vector3d{0, 14, 14},
+                                                 Eigen::Vector3d{0, 0, 0}};
+    cv::namedWindow("input_image");
+    cv::setMouseCallback("input_image", on_MouseHandle, (void *) &input_image);
+    while (true) {
+        cv::imshow("input_image", input_image);
+        cv::waitKey(40);
+        if (image_points.size() == 13) {
+            break;
+        }
+    }
+}
