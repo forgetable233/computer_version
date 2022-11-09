@@ -68,6 +68,8 @@ public:
 
     static inline double Convolution(const Eigen::MatrixXd &core, Eigen::MatrixXd &matrix);
 
+    static inline bool isMax(Eigen::Matrix3d &tar);
+
     double ComputeSNR(int choose);
 
     static inline double GetMiddleValue(Eigen::Matrix3d &matrix);

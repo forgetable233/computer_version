@@ -460,76 +460,80 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
 void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
                                     std::vector<cv::Point2i> &feature_points,
                                     std::vector<cv::Mat> &features) {
+    std::cout << "Begin the Harris detect" << std::endl;
     const int rows = srcImg.rows;
     const int cols = srcImg.cols;
+    const int ksize = 3;
+
+    const double alpha = 0.05;
+    const double threshold = 1.5e9;
 
     cv::Mat grey_img;
+    cv::Mat Ix;
+    cv::Mat Iy;
+    cv::Mat Ixy;
+    cv::Mat M;
+
+    /** 转化为灰度图 **/
     cv::cvtColor(srcImg, grey_img, cv::COLOR_BGR2GRAY);
-    /** 转化成eigen好操作 **/
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> src_img(rows, cols);
-    Eigen::Matrix3d dy;
-    Eigen::Matrix3d dx;
-    Eigen::MatrixXd gaussian(3, 3);
-    Eigen::MatrixXd Ix(rows + 2, cols + 2);
-    Eigen::MatrixXd Iy(rows + 2, cols + 2);
-    Eigen::MatrixXd Ixy(rows + 2, cols + 2);
+
+    /** 计算对应的梯度信息 **/
+    cv::Sobel(grey_img, Ix, CV_8U, 1, 0, ksize);
+    cv::Sobel(grey_img, Iy, CV_8U, 0, 1, ksize);
+//    cv::imshow("Ix", Ix);
+//    cv::waitKey(0);
+    Ix.convertTo(Ix, CV_32F);
+    Iy.convertTo(Iy, CV_32F);
+    Ixy = Ix * Iy;
+    Ix = Ix * Ix;
+    Iy = Iy * Iy;
+
+    /** 进行高斯平滑操作，窗口大小为3 **/
+    cv::GaussianBlur(Ix, Ix, cv::Size(ksize, ksize), 2);
+    cv::GaussianBlur(Iy, Iy, cv::Size(ksize, ksize), 2);
+    cv::GaussianBlur(Ixy, Ixy, cv::Size(ksize, ksize), 2);
+
+    /** 转化成eigen方便计算 **/
+    Eigen::MatrixXd Ix_eigen(rows, cols);
+    Eigen::MatrixXd Iy_eigen(rows, cols);
+    Eigen::MatrixXd Ixy_eigen(rows, cols);
     Eigen::MatrixXd R(rows, cols);
-    Eigen::MatrixXd homo_mat(rows + 2, cols + 2);
+    Eigen::Tensor<double, 4> M_eigen(rows, cols, 2, 2);
 
-    Eigen::MatrixXd M(rows, cols);
-
-    cv::cv2eigen(grey_img, src_img);
-    homo_mat.block(1, 1, rows, cols) = src_img;
-    dy << -1, 0, 1,
-            -1, 0, 1,
-            -1, 0, 1;
-    dx << -1, -1, -1,
-            0, 0, 0,
-            1, 1, 1;
-    CreateGaussianCore(0, 1, gaussian);
-    std::vector<std::thread> threads;
-    const int task_num = static_cast<int>(homo_mat.rows());
-    const int avg_num = task_num / THREAD_NUM;
-    std::cout << avg_num << std::endl;
-    /** 计算Ix， Iy， Ixy **/
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        threads.emplace_back([i, avg_num, cols, &Ix, &Iy, &Ixy, &dx, &dy, &homo_mat]() {
-            int count = 0;
-            for (int j = i * avg_num + 1; j < (i + 1) * avg_num + 1; ++j) {
-                std::cout << count++ << std::endl;
-                for (int t = 1; t < cols + 1; ++t) {
-                    Ix(j, t) = (dx.array() * homo_mat.block<3, 3>(j - 1, t - 1).array()).sum();
-                    Iy(j, t) = (dy.array() * homo_mat.block<3, 3>(j - 1, t - 1).array()).sum();
-                    Ixy(j, t) = Ix(j, t) * Iy(j, t);
-                    Ix(j, t) *= Ix(j, t), Iy *= Iy(j, t);
-                }
+    cv::cv2eigen(Ix, Ix_eigen);
+    cv::cv2eigen(Iy, Iy_eigen);
+    cv::cv2eigen(Ixy, Ixy_eigen);
+    /** 构建对应的M矩阵同时计算R矩阵，同时计算响应值R **/
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            M_eigen(i, j, 0, 0) = Ix_eigen(i, j);
+            M_eigen(i, j, 0, 1) = Ixy_eigen(i, j);
+            M_eigen(i, j, 1, 0) = Ixy_eigen(i, j);
+            M_eigen(i, j, 1, 1) = Iy_eigen(i, j);
+            R(i, j) = Ix_eigen(i, j) * Iy_eigen(i, j) - Ixy_eigen(i, j) * Ixy_eigen(i, j);
+            R(i, j) -= alpha * pow(Ix_eigen(i, j) + Iy_eigen(i, j), 2);
+            if (R(i, j) < threshold) {
+                R(i, j) = 0;
             }
-        });
+        }
     }
-    for (auto &t : threads) {
-        t.join();
-    }
-
+    std::cout << "Finish building M matrix and R matrix" << std::endl;
+    /** 下面进行NMS，寻找对应的局部最大值，并保存到feature_points中，这里使用了3 * 3的矩阵 **/
+    std::cout << "Begin the NMS" << std::endl;
+    Eigen::MatrixXd temp_matrix(rows + 2, cols + 2);
+    temp_matrix.block(1, 1, rows, cols) = R;
+    Eigen::Matrix3d core;
+    bool test_re = false;
     for (int i = 1; i < rows + 1; ++i) {
         for (int j = 1; j < cols + 1; ++j) {
-            double A, B, C;
-            A = (gaussian.array() * Ix.block<3, 3>(i - 1, j - 1).array()).sum();
-            B = (gaussian.array() * Iy.block<3, 3>(i - 1, j - 1).array()).sum();
-            C = (gaussian.array() * Ixy.block<3, 3>(i - 1, j - 1).array()).sum();
-            R(i - 1, j - 1) = (A * B - C * C) - ALPHA * (A * C);
-        }
-    }
-    /** 进行NMS **/
-    for (int i = 1; i < rows - 1; ++i) {
-        for (int j = 1; j < cols - 1; ++j) {
-            double max = R.block<3, 3>(i - 1, j - 1).maxCoeff();
-            if (max == R(i, j) && R(i, j) > THRESHOLD) {
-                feature_points.emplace_back(i, j);
+            core = temp_matrix.block<3, 3>(i - 1, j - 1);
+            test_re = isMax(core);
+            if (test_re) {
+                feature_points.emplace_back(i - 1, j - 1);
             }
         }
     }
-    std::cout << "Finish harris detect" << std::endl;
-    std::cout << "Have detected " << feature_points.size() << " points" << std::endl;
+    std::cout << "Finish harris detector" << std::endl;
 }
 
 void ImageProcessor::CreateGaussianCore(double mean, double sigma, Eigen::MatrixXd &core) {
@@ -543,4 +547,21 @@ void ImageProcessor::CreateGaussianCore(double mean, double sigma, Eigen::Matrix
     }
     /** 归一化 **/
     core /= core.sum();
+}
+
+bool ImageProcessor::isMax(Eigen::Matrix3d &tar) {
+    if (tar(1, 1) == 0) {
+        return false;
+    }
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            if (i == 1 && j == 1) {
+                continue;
+            }
+            if (tar(i, j) > tar(1, 1)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }

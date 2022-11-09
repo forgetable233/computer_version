@@ -7,22 +7,36 @@
 #define PI acos(-1)
 
 int main() {
-    std::string file_path = "../picture.jpg";
+    std::string file_path = "../bw.jpeg";
     cv::Mat input_image = cv::imread(file_path);
     cv::Mat resized;
-    cv::resize(input_image, resized, cv::Size(512, 512));
+    cv::resize(input_image, resized, cv::Size(300, 300));
+    cv::Mat t = resized.clone();
     std::vector<cv::Point2i> feature_points;
     std::vector<cv::Mat> features;
     ImageProcessor::HarrisDetector(resized, feature_points, features);
+    std::cout << "Have detected " << feature_points.size() << " feature points" << std::endl;
     for (auto &point: feature_points) {
-        resized.at<cv::Vec3b>(point.x, point.y)[0] = 0;
-        resized.at<cv::Vec3b>(point.x, point.y)[1] = 0;
-        resized.at<cv::Vec3b>(point.x, point.y)[2] = 0xff;
+        cv::circle(resized, cv::Point(point.x, point.y), 2, cv::Scalar(0, 0, 255), 2, 8, 0);
     }
     std::cout << input_image.rows << ' ' << input_image.cols << std::endl;
     cv::imshow("points", resized);
     cv::waitKey(0);
-    //    int rows, cols;
+    cv::Mat cv_harris;
+    cv::Mat grey_img;
+    cv::cvtColor(t, grey_img, cv::COLOR_BGR2GRAY);
+    cv::cornerHarris(grey_img, cv_harris, 2, 3, 0.01);
+    cv::normalize(cv_harris, cv_harris, 0, 255, cv::NORM_MINMAX, CV_32FC1, cv::Mat());
+    cv::convertScaleAbs(cv_harris, cv_harris);
+    for (int i = 0; i < t.rows; ++i) {
+        for (int j = 0; j < t.cols; ++j) {
+            if (cv_harris.at<double>(i, j) > 130) {
+                cv::circle(t, cv::Point(i, j), 2, cv::Scalar(0, 0, 255), 2, 8, 0);
+            }
+        }
+    }
+    cv::imshow("harris", t);
+    cv::waitKey(0);
 //
 //    auto target_image = new ImageProcessor(file_path);
 //    std::cout << "Please input the target image size" << std::endl;
