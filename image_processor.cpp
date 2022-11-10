@@ -457,6 +457,12 @@ void ImageProcessor::NMS(Eigen::Matrix<uchar, -1, -1> &M, Eigen::MatrixXd &angle
 //    ViewImage(SALT_PEPPER_FILTERED);
 }
 
+/**
+ * 实现Harris角点检测
+ * @param srcImg
+ * @param feature_points
+ * @param features
+ */
 void ImageProcessor::HarrisDetector(cv::Mat &srcImg,
                                     std::vector<cv::Point2i> &feature_points,
                                     std::vector<cv::Mat> &features) {
@@ -549,6 +555,11 @@ void ImageProcessor::CreateGaussianCore(double mean, double sigma, Eigen::Matrix
     core /= core.sum();
 }
 
+/**
+ * 判断中心是否为局部最大值
+ * @param tar
+ * @return
+ */
 bool ImageProcessor::isMax(Eigen::Matrix3d &tar) {
     if (tar(1, 1) == 0) {
         return false;
@@ -567,6 +578,14 @@ bool ImageProcessor::isMax(Eigen::Matrix3d &tar) {
 }
 
 std::vector<Eigen::Vector2d> image_points;
+/****
+ * 鼠标回调函数，标记对应的点
+ * @param event
+ * @param x
+ * @param y
+ * @param flag
+ * @param param
+ */
 void on_MouseHandle(int event, int x, int y, int flag, void *param) {
     cv::Mat image = *(cv::Mat*) param;
 //    std::vector<Eigen::Vector2d> image_points = *(std::vector<Eigen::Vector2d> *) param;
@@ -579,6 +598,10 @@ void on_MouseHandle(int event, int x, int y, int flag, void *param) {
     }
 }
 
+/****
+ * 输入一张图片，进行相机的标定
+ * @param input_image
+ */
 void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
     /** 规定相关点单位为cm，首先计算对应的P矩阵，已知最少需要6个点才能得到对应的P，这里使用7个点（感觉可以提升精确度） **/
     std::vector<Eigen::Vector3d> world_points = {Eigen::Vector3d{7, 7, 0},
@@ -593,13 +616,6 @@ void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
                                                  Eigen::Vector3d{0, 14, 7},
                                                  Eigen::Vector3d{0, 7, 14},
                                                  Eigen::Vector3d{0, 14, 14}};
-//    std::vector<Eigen::Vector2d> image_points = {Eigen::Vector2d{332, 370},
-//                                                 Eigen::Vector2d{345, 410},
-//                                                 Eigen::Vector2d{375, 300},
-//                                                 Eigen::Vector2d{396, 260},
-//                                                 Eigen::Vector2d{283, 312},
-//                                                 Eigen::Vector2d{239, 285},
-//                                                 Eigen::Vector2d{322, 337}};
 
     cv::namedWindow("input_image");
     cv::setMouseCallback("input_image", on_MouseHandle, (void *) &input_image);
@@ -675,4 +691,5 @@ void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
     double f = 0.0;
     f = (25.4 / (1.8 * 768)) * 0.8 * fabs(K(0, 0));
     std::cout << "The f of the camera is" << f << std::endl;
+    cv::imwrite("../marked.jpg", input_image);
 }

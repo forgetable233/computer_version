@@ -162,3 +162,4 @@ compile_commands.json
 CTestTestfile.cmake
 
 *.jpg
+*.png

@@ -7,16 +7,16 @@
 #define PI acos(-1)
 
 int main() {
-    std::string file_path = "../stereo2012a.jpg";
-    cv::Mat tar_image = cv::imread(file_path);
-    ImageProcessor::CameraCalibration(tar_image);
-//    std::string file_path = "../bw.jpeg";
-//    cv::Mat input_image = cv::imread(file_path);
-//    cv::Mat resized;
-//    cv::resize(input_image, resized, cv::Size(300, 300));
-//    cv::Mat t = resized.clone();
-//    std::vector<cv::Point2i> feature_points;
-//    std::vector<cv::Mat> features;
+//    std::string file_path = "../stereo2012a.jpg";
+//    cv::Mat tar_image = cv::imread(file_path);
+//    ImageProcessor::CameraCalibration(tar_image);
+    std::string file_path = "../bw.jpeg";
+    cv::Mat input_image = cv::imread(file_path);
+    cv::Mat resized;
+    cv::resize(input_image, resized, cv::Size(300, 300));
+    cv::Mat t = resized.clone();
+    std::vector<cv::Point2i> feature_points;
+    std::vector<cv::Mat> features;
 //    ImageProcessor::HarrisDetector(resized, feature_points, features);
 //    std::cout << "Have detected " << feature_points.size() << " feature points" << std::endl;
 //    for (auto &point: feature_points) {
@@ -25,24 +25,29 @@ int main() {
 //    std::cout << input_image.rows << ' ' << input_image.cols << std::endl;
 //    cv::imshow("points", resized);
 //    cv::waitKey(0);
-//    cv::Mat cv_harris;
-//    cv::Mat grey_img;
-//    cv::cvtColor(t, grey_img, cv::COLOR_BGR2GRAY);
-//    cv::cornerHarris(grey_img, cv_harris, 2, 3, 0.01);
-//    cv::normalize(cv_harris, cv_harris, 0, 255, cv::NORM_MINMAX, CV_32FC1, cv::Mat());
-//    cv::convertScaleAbs(cv_harris, cv_harris);
-//    for (int i = 0; i < t.rows; ++i) {
-//        for (int j = 0; j < t.cols; ++j) {
-//            if (cv_harris.at<double>(i, j) > 130) {
-//                cv::circle(t, cv::Point(i, j), 2, cv::Scalar(0, 0, 255), 2, 8, 0);
-//            }
-//        }
-//    }
+
+    cv::Mat cv_harris;
+    cv::Mat norm_harris;
+    cv::Mat norm_dst;
+    cv::Mat grey_img;
+    cv::cvtColor(resized, grey_img, cv::COLOR_BGR2GRAY);
+    cv::cornerHarris(grey_img, cv_harris, 2, 3, 0.04);
+    cv::normalize(cv_harris, norm_harris, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+    cv::convertScaleAbs(norm_harris, norm_dst);
+    cv::imshow("test", cv_harris);
+    cv::waitKey(0);
+    for (int i = 0; i < t.rows; ++i) {
+        for (int j = 0; j < t.cols; ++j) {
+            if (norm_dst.at<u_char>(i, j) > 200) {
+                cv::circle(t, cv::Point(i, j), 2, cv::Scalar(0, 0, 255), 2, 8, 0);
+            }
+        }
+    }
 //    cv::imwrite("../my_harris.jpg", resized);
-//    cv::imwrite("../harris_result.jpg", t);
-//    cv::imshow("harris", t);
-//    cv::waitKey(0);
-//
+    cv::imwrite("../harris_result.jpg", t);
+    cv::imshow("harris", t);
+    cv::waitKey(0);
+
 //    auto target_image = new ImageProcessor(file_path);
 //    std::cout << "Please input the target image size" << std::endl;
 //    std::cin >> rows >> cols;
