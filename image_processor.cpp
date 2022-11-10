@@ -580,6 +580,7 @@ void on_MouseHandle(int event, int x, int y, int flag, void *param) {
 }
 
 void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
+    /** 规定相关点单位为cm，首先计算对应的P矩阵，已知最少需要6个点才能得到对应的P，这里使用7个点（感觉可以提升精确度） **/
     std::vector<Eigen::Vector3d> world_points = {Eigen::Vector3d{7, 7, 0},
                                                  Eigen::Vector3d{14, 7, 0},
                                                  Eigen::Vector3d{7, 14, 0},
@@ -591,15 +592,87 @@ void ImageProcessor::CameraCalibration(cv::Mat &input_image) {
                                                  Eigen::Vector3d{0, 7, 7},
                                                  Eigen::Vector3d{0, 14, 7},
                                                  Eigen::Vector3d{0, 7, 14},
-                                                 Eigen::Vector3d{0, 14, 14},
-                                                 Eigen::Vector3d{0, 0, 0}};
+                                                 Eigen::Vector3d{0, 14, 14}};
+//    std::vector<Eigen::Vector2d> image_points = {Eigen::Vector2d{332, 370},
+//                                                 Eigen::Vector2d{345, 410},
+//                                                 Eigen::Vector2d{375, 300},
+//                                                 Eigen::Vector2d{396, 260},
+//                                                 Eigen::Vector2d{283, 312},
+//                                                 Eigen::Vector2d{239, 285},
+//                                                 Eigen::Vector2d{322, 337}};
+
     cv::namedWindow("input_image");
     cv::setMouseCallback("input_image", on_MouseHandle, (void *) &input_image);
+    Eigen::MatrixXd func(2 * world_points.size(), 12);
+    func.setZero();
+    Eigen::MatrixXd temp_func(12, 12);
+    Eigen::MatrixXd P(3, 4);
     while (true) {
         cv::imshow("input_image", input_image);
         cv::waitKey(40);
-        if (image_points.size() == 13) {
+        if (image_points.size() == world_points.size()) {
             break;
         }
     }
+    cv::imshow("input_image", input_image);
+    cv::waitKey(0);
+    /** 构建DLT用于计算P矩阵为一个24 * 12的矩阵 **/
+    for (int i = 0; i < world_points.size(); ++i) {
+        func.block<1, 4>(i * 2, 4) = -world_points[i].homogeneous().transpose();
+        func.block<1, 4>(i * 2, 8) = image_points[i].y() * world_points[i].homogeneous().transpose();
+        func.block<1, 4>(i * 2 + 1, 0) = world_points[i].homogeneous().transpose();
+        func.block<1, 4>(i * 2 + 1, 8) = image_points[i].x() * world_points[i].homogeneous().transpose();
+    }
+    /** 求解方程，为特征值最小的特征向量，这里使用的为超定解 **/
+    temp_func = func.transpose() * func;
+    Eigen::EigenSolver<Eigen::Matrix<double, 12, 12>> solver(temp_func);
+    Eigen::MatrixXd pseudo_matrix(12, 12);
+    Eigen::MatrixXd pseudo_value(12, 12);
+    pseudo_value = solver.pseudoEigenvalueMatrix();
+    pseudo_matrix = solver.pseudoEigenvectors();
+    int min_index = 0;
+    double min_value = MAXFLOAT;
+    for (int i = 0; i < 12; ++i) {
+        if(pseudo_value(i, i) < min_value) {
+            min_value = pseudo_value(i, i);
+            min_index = i;
+        }
+    }
+    std::cout << "The min index is " << min_index << std::endl;
+    std::cout << "Have finished the matrix compute" << std::endl;
+    P.block<1, 4>(0, 0) = pseudo_matrix.block<4, 1>(0, min_index).transpose();
+    P.block<1, 4>(1, 0) = pseudo_matrix.block<4, 1>(4, min_index).transpose();
+    P.block<1, 4>(2, 0) = pseudo_matrix.block<4, 1>(8, min_index).transpose();
+    P /= P(2, 3);
+    std::cout << "The P matrix is: " << std::endl << std::endl;
+    std::cout << P << std::endl << std::endl;
+    /** 下面从P矩阵中恢复相机的内参和外参，这里使用了QR分解 **/
+    Eigen::MatrixXd temp_P(3, 3);
+    /** 将P矩阵分解，使用QR计算出K和R **/
+    temp_P = P.block<3, 3>(0, 0);
+    Eigen::HouseholderQR<Eigen::Matrix<double, 3, 3>> qr;
+    qr.compute(temp_P.inverse());
+    Eigen::MatrixXd K = qr.matrixQR().triangularView<Eigen::Upper>();
+    Eigen::MatrixXd R = qr.householderQ();
+    R = R.inverse();
+    K = K.inverse();
+    K /= K(2, 2);
+//    K /= K(2, 2);
+//    K(0, 1) = 0;
+//    R = K.inverse() * temp_P;
+    Eigen::Vector3d camera_pose;
+    Eigen::Vector3d P_t;
+    camera_pose.setZero();
+    P_t = P.block<3, 1>(0, 3);
+    std::cout << "The K matrix is:" << std::endl << std::endl;
+    std::cout << K << std::endl << std::endl;
+    std::cout << "The R matrix is:" << std::endl << std::endl;
+    std::cout << R << std::endl << std::endl;
+    std::cout << R.determinant() << std::endl;
+    camera_pose = -temp_P.inverse()  * P_t;
+    std::cout << "The pose of the camera is " << std::endl;
+    std::cout << camera_pose << std::endl;
+    double f = 0.0;
+    f = (25.4 / (1.8 * 768)) * 0.8 * fabs(K(0, 0));
+    std::cout << "The f of the camera is" << f << std::endl;
 }
